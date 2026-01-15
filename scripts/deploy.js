@@ -149,7 +149,7 @@ async function main() {
   console.log("=".repeat(60));
 
   console.log("\nNext Steps:");
-  console.log("1. Verify contracts on Polygonscan: npm run verify:mumbai");
+  console.log("1. Verify contracts on Polygonscan: npm run verify:amoy");
   console.log("2. Distribute tokens to initial DAO members");
   console.log("3. Create your first governance proposal");
   console.log("4. Fund the treasury with operational capital");

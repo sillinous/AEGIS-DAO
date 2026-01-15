@@ -76,22 +76,22 @@ npm test
 
 ### Deploy to Testnet
 
-1. Get Mumbai testnet MATIC from [Polygon Faucet](https://faucet.polygon.technology/)
+1. Get Amoy testnet POL from [Polygon Faucet](https://faucet.polygon.technology/)
 
 2. Configure `.env`:
    ```
    PRIVATE_KEY=your_private_key
-   MUMBAI_RPC_URL=https://rpc-mumbai.maticvigil.com
+   AMOY_RPC_URL=https://rpc-amoy.polygon.technology
    ```
 
 3. Deploy:
    ```bash
-   npm run deploy:mumbai
+   npm run deploy:amoy
    ```
 
 4. Verify contracts (optional):
    ```bash
-   npm run verify:mumbai
+   npm run verify:amoy
    ```
 
 ## Commands
@@ -101,9 +101,9 @@ npm run compile        # Compile contracts
 npm test               # Run test suite
 npm run test:coverage  # Run tests with coverage
 npm run deploy:local   # Deploy to local Hardhat node
-npm run deploy:mumbai  # Deploy to Polygon Mumbai
+npm run deploy:amoy    # Deploy to Polygon Amoy testnet
 npm run deploy:polygon # Deploy to Polygon Mainnet
-npm run verify:mumbai  # Verify contracts on Polygonscan
+npm run verify:amoy    # Verify contracts on Polygonscan
 npm run node           # Start local Hardhat node
 npm run clean          # Clean build artifacts
 ```
@@ -164,7 +164,7 @@ AEGIS-DAO/
 | Network | Chain ID | Explorer |
 |---------|----------|----------|
 | Polygon Mainnet | 137 | [polygonscan.com](https://polygonscan.com) |
-| Mumbai Testnet | 80001 | [mumbai.polygonscan.com](https://mumbai.polygonscan.com) |
+| Amoy Testnet | 80002 | [amoy.polygonscan.com](https://amoy.polygonscan.com) |
 
 ## Next Steps After Deployment
 
