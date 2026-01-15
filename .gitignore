@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Hardhat
+cache/
+artifacts/
+typechain-types/
+
+# Coverage
+coverage/
+coverage.json
+
+# Environment (CRITICAL - never commit private keys)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+
+# Deployment records (may contain sensitive info)
+deployments/localhost/
+deployments/hardhat/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test artifacts
+.nyc_output/
+
+# Original Claude Desktop export (restructured into proper folders)
+AEGIS DAO - Deployment Package/
