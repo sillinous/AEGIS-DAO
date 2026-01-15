@@ -6,6 +6,7 @@ module.exports = {
   solidity: {
     version: "0.8.24",
     settings: {
+      evmVersion: "cancun", // Required for OpenZeppelin 5.x (mcopy opcode)
       optimizer: {
         enabled: true,
         runs: 200,
