@@ -142,6 +142,20 @@ npm run clean          # Clean build artifacts
 - **OpenZeppelin Base**: Battle-tested, audited contracts
 - **No Admin Keys**: After deployment, only governance controls the DAO
 
+## Frontend
+
+A React governance dashboard for interacting with the DAO.
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+# Set contract addresses in .env
+npm run dev
+```
+
+**Features**: wallet connection, governance dashboard, proposal listing with voting, proposal creation (native/token transfers), and vote delegation management.
+
 ## Project Structure
 
 ```
@@ -150,6 +164,13 @@ AEGIS-DAO/
 │   ├── AEGISToken.sol      # Governance token
 │   ├── AEGISGovernor.sol   # DAO governance
 │   └── AEGISTreasury.sol   # Timelock treasury
+├── frontend/               # React governance dashboard
+│   ├── src/
+│   │   ├── components/     # UI components
+│   │   ├── context/        # Web3 wallet context
+│   │   ├── abis.js         # Contract ABIs
+│   │   └── App.jsx         # App shell
+│   └── package.json
 ├── scripts/
 │   ├── deploy.js           # Deployment script
 │   └── verify.js           # Contract verification
