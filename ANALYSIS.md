@@ -98,10 +98,8 @@ AEGISToken (ERC20 + Votes) → AEGISGovernor (Governor) → AEGISTreasury (Timel
 
 ### Concerns
 
-1. **Polygon block time mismatch (BUG)** — Governance parameters assume ~12s blocks (Ethereum). Polygon has ~2s blocks, making:
-   - Voting delay: ~4 hours instead of ~1 day
-   - Voting period: ~28 hours instead of ~1 week
-2. **Proposal threshold = 0** — anyone can spam proposals with no token cost
+1. ~~**Polygon block time mismatch (BUG)**~~ — **FIXED**: Switched to timestamp-based governance (EIP-6372), chain-agnostic
+2. ~~**Proposal threshold = 0**~~ — **FIXED**: 1,000 AEGIS (0.1% of supply) threshold added
 3. **Fixed supply, no mint** — limits future tokenomics flexibility
 4. **100% tokens to deployer** — centralization risk until distribution occurs
 5. **Executor role restricted to Governor only** — if Governor contract has a bug, no one can execute queued proposals
@@ -141,12 +139,55 @@ The README references an "AgenticProtocolsForAutonomousRevenue roadmap" in the n
 
 ---
 
+## Fixes Applied
+
+The following issues identified in this analysis have been addressed:
+
+### 1. CRITICAL: Polygon Block Time Mismatch (Fixed)
+
+**Problem:** Governor used block-number-based timing (7200 / 50400 blocks) assuming 12s Ethereum blocks. On Polygon's ~2s blocks, voting delay was ~4 hours instead of 1 day, and voting period was ~28 hours instead of 1 week.
+
+**Fix:** Switched to **timestamp-based governance** via EIP-6372. Both `AEGISToken` and `AEGISGovernor` now override `clock()` to return `block.timestamp` and `CLOCK_MODE()` to return `"mode=timestamp"`. Governance parameters are now in seconds (86400 / 604800), making timing **chain-agnostic** — works correctly on Polygon, Ethereum, or any EVM chain.
+
+### 2. Proposal Threshold = 0 (Fixed)
+
+**Problem:** Anyone could create proposals with zero tokens, enabling spam attacks.
+
+**Fix:** Added 1,000 AEGIS proposal threshold (0.1% of supply). High enough to prevent spam, low enough to keep governance accessible.
+
+### 3. Missing Test Coverage (Fixed)
+
+**Problem:** Tests only covered happy-path governance and quorum failure.
+
+**Added tests:**
+- Token and Governor timestamp clock mode verification
+- Proposal defeated by majority "Against" votes (quorum met but rejected)
+- Proposer cancellation of pending proposals
+- Proposal threshold enforcement (rejects underfunded proposers)
+- Unauthorized direct treasury access rejected (access control)
+
+### 4. Documentation Out of Sync (Fixed)
+
+- README governance parameters updated to reflect timestamp mode and proposal threshold
+- Deploy script console output corrected
+- Security features list updated
+
+### Remaining Items (Not Addressed — Require Design Decisions)
+
+- **No pause mechanism** — Requires deciding who controls pause (governance is too slow for emergencies)
+- **No upgradeability** — Major architectural choice (proxy pattern vs immutable)
+- **No frontend** — Separate project scope
+- **Token distribution** — Operational, not a code issue
+- **Executor role** — Current setup (Governor-only) is safer than open execution
+
+---
+
 ## Statistics
 
 | Metric | Value |
 |---|---|
-| Smart Contract LOC | ~150 (slim, OZ-based) |
-| Test Cases | 9 |
+| Smart Contract LOC | ~170 (slim, OZ-based) |
+| Test Cases | 14 |
 | Total Files | 12 (excluding node_modules, artifacts) |
 | Production Dependencies | 2 |
 | Dev Dependencies | 11 |

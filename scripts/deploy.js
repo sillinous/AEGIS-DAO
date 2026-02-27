@@ -107,8 +107,8 @@ async function main() {
   console.log("  Deployer Balance:", hre.ethers.formatEther(deployerBalance), "AEGIS");
 
   console.log("\nGovernance Parameters:");
-  console.log("  Voting Delay:", votingDelay.toString(), "blocks (~1 day)");
-  console.log("  Voting Period:", votingPeriod.toString(), "blocks (~1 week)");
+  console.log("  Voting Delay:", votingDelay.toString(), "seconds (1 day, timestamp mode)");
+  console.log("  Voting Period:", votingPeriod.toString(), "seconds (1 week, timestamp mode)");
   console.log("  Quorum: 4% of total supply");
   console.log("  Timelock Delay:", TIMELOCK_DELAY, "seconds");
 

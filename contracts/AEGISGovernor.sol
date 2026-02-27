@@ -27,14 +27,23 @@ contract AEGISGovernor is
     )
         Governor("AEGIS Governor")
         GovernorSettings(
-            7200,  // 1 day voting delay (blocks at ~12s/block)
-            50400, // 1 week voting period (blocks)
-            0      // No proposal threshold initially
+            86400,          // 1 day voting delay (seconds, timestamp mode)
+            604800,         // 1 week voting period (seconds, timestamp mode)
+            1_000 * 10**18  // 1,000 AEGIS proposal threshold (0.1% of supply)
         )
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(4) // 4% quorum
         GovernorTimelockControl(_timelock)
     {}
+
+    // Use timestamp-based governance (EIP-6372) for chain-agnostic timing
+    function clock() public view override returns (uint48) {
+        return uint48(block.timestamp);
+    }
+
+    function CLOCK_MODE() public pure override returns (string memory) {
+        return "mode=timestamp";
+    }
 
     // Required overrides for multiple inheritance
     function votingDelay()

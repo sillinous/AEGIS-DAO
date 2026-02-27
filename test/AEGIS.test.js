@@ -7,6 +7,9 @@ describe("AEGIS DAO", function () {
   let deployer, voter1, voter2, recipient;
   const INITIAL_SUPPLY = ethers.parseEther("1000000"); // 1M tokens
   const TIMELOCK_DELAY = 86400; // 1 day
+  const VOTING_DELAY = 86400; // 1 day in seconds (timestamp mode)
+  const VOTING_PERIOD = 604800; // 1 week in seconds (timestamp mode)
+  const PROPOSAL_THRESHOLD = ethers.parseEther("1000"); // 1,000 AEGIS
 
   beforeEach(async function () {
     [deployer, voter1, voter2, recipient] = await ethers.getSigners();
@@ -74,6 +77,12 @@ describe("AEGIS DAO", function () {
         ethers.parseEther("100000")
       );
     });
+
+    it("should use timestamp-based clock mode", async function () {
+      expect(await token.CLOCK_MODE()).to.equal("mode=timestamp");
+      const block = await ethers.provider.getBlock("latest");
+      expect(await token.clock()).to.equal(block.timestamp);
+    });
   });
 
   describe("AEGISTreasury", function () {
@@ -99,20 +108,39 @@ describe("AEGIS DAO", function () {
         await treasury.hasRole(PROPOSER_ROLE, await governor.getAddress())
       ).to.be.true;
     });
+
+    it("should reject unauthorized direct operations", async function () {
+      await expect(
+        treasury.connect(voter1).schedule(
+          recipient.address,
+          ethers.parseEther("1"),
+          "0x",
+          ethers.ZeroHash,
+          ethers.id("unauthorized-salt"),
+          TIMELOCK_DELAY
+        )
+      ).to.be.revertedWithCustomError(treasury, "AccessControlUnauthorizedAccount");
+    });
   });
 
   describe("AEGISGovernor", function () {
     it("should have correct governance parameters", async function () {
-      expect(await governor.votingDelay()).to.equal(7200n);
-      expect(await governor.votingPeriod()).to.equal(50400n);
-      expect(await governor.proposalThreshold()).to.equal(0n);
+      expect(await governor.votingDelay()).to.equal(BigInt(VOTING_DELAY));
+      expect(await governor.votingPeriod()).to.equal(BigInt(VOTING_PERIOD));
+      expect(await governor.proposalThreshold()).to.equal(PROPOSAL_THRESHOLD);
+    });
+
+    it("should use timestamp-based clock mode", async function () {
+      expect(await governor.CLOCK_MODE()).to.equal("mode=timestamp");
+      const block = await ethers.provider.getBlock("latest");
+      expect(await governor.clock()).to.equal(block.timestamp);
     });
 
     it("should calculate quorum correctly", async function () {
-      const blockNumber = await ethers.provider.getBlockNumber();
-      // Mine a block to ensure checkpoint exists
+      const block = await ethers.provider.getBlock("latest");
+      // Mine a block so the timestamp is in the past
       await mine(1);
-      const quorum = await governor.quorum(blockNumber);
+      const quorum = await governor.quorum(block.timestamp);
       // 4% of 1M = 40,000 tokens
       expect(quorum).to.equal(ethers.parseEther("40000"));
     });
@@ -139,6 +167,24 @@ describe("AEGIS DAO", function () {
         (log) => log.fragment && log.fragment.name === "ProposalCreated"
       );
       expect(event).to.not.be.undefined;
+    });
+
+    it("should reject proposals from accounts below threshold", async function () {
+      const tokenAddress = await token.getAddress();
+      const transferCalldata = token.interface.encodeFunctionData("transfer", [
+        recipient.address,
+        ethers.parseEther("100"),
+      ]);
+
+      // voter2 has 0 tokens, threshold is 1000
+      await expect(
+        governor.connect(voter2).propose(
+          [tokenAddress],
+          [0],
+          [transferCalldata],
+          "Should fail - no tokens"
+        )
+      ).to.be.revertedWithCustomError(governor, "GovernorInsufficientProposerVotes");
     });
   });
 
@@ -184,16 +230,16 @@ describe("AEGIS DAO", function () {
       // Check initial state
       expect(await governor.state(proposalId)).to.equal(0); // Pending
 
-      // Wait for voting delay
-      await mine(7201);
+      // Wait for voting delay (1 day in seconds)
+      await time.increase(VOTING_DELAY + 1);
       expect(await governor.state(proposalId)).to.equal(1); // Active
 
       // Cast votes
       await governor.castVote(proposalId, 1); // For
       await governor.connect(voter1).castVote(proposalId, 1); // For
 
-      // Wait for voting period to end
-      await mine(50401);
+      // Wait for voting period to end (1 week in seconds)
+      await time.increase(VOTING_PERIOD + 1);
       expect(await governor.state(proposalId)).to.equal(4); // Succeeded
 
       // Queue proposal
@@ -228,9 +274,6 @@ describe("AEGIS DAO", function () {
     });
 
     it("should reject proposals that don't meet quorum", async function () {
-      // Deployer only has ~850k tokens after transfers
-      // Quorum is 4% = 40k, so we need to make sure only voter2 votes (who has 0)
-
       const tokenAddress = await token.getAddress();
       const transferCalldata = token.interface.encodeFunctionData("transfer", [
         recipient.address,
@@ -251,20 +294,86 @@ describe("AEGIS DAO", function () {
       proposalId = event.args.proposalId;
 
       // Wait for voting delay
-      await mine(7201);
+      await time.increase(VOTING_DELAY + 1);
 
-      // Only voter2 votes (who has no tokens/voting power)
-      await token.connect(voter2).delegate(voter2.address);
-      await mine(1);
-
-      // Voter2 has 0 voting power - skip vote or vote with 0 power
-      // Actually let's just not vote at all
+      // No one votes
 
       // Wait for voting period
-      await mine(50401);
+      await time.increase(VOTING_PERIOD + 1);
 
       // Should be Defeated due to no votes meeting quorum
       expect(await governor.state(proposalId)).to.equal(3); // Defeated
+    });
+
+    it("should defeat proposals with majority Against votes", async function () {
+      const tokenAddress = await token.getAddress();
+      const transferCalldata = token.interface.encodeFunctionData("transfer", [
+        recipient.address,
+        ethers.parseEther("100"),
+      ]);
+
+      const proposeTx = await governor.propose(
+        [tokenAddress],
+        [0],
+        [transferCalldata],
+        "Controversial proposal"
+      );
+
+      const receipt = await proposeTx.wait();
+      const event = receipt.logs.find(
+        (log) => log.fragment && log.fragment.name === "ProposalCreated"
+      );
+      proposalId = event.args.proposalId;
+
+      // Wait for voting delay
+      await time.increase(VOTING_DELAY + 1);
+
+      // Deployer votes Against (850k tokens), voter1 votes For (50k tokens)
+      await governor.castVote(proposalId, 0); // Against
+      await governor.connect(voter1).castVote(proposalId, 1); // For
+
+      // Wait for voting period
+      await time.increase(VOTING_PERIOD + 1);
+
+      // Should be Defeated - Against has majority even though quorum was met
+      expect(await governor.state(proposalId)).to.equal(3); // Defeated
+    });
+
+    it("should allow proposer to cancel a pending proposal", async function () {
+      const tokenAddress = await token.getAddress();
+      const transferCalldata = token.interface.encodeFunctionData("transfer", [
+        recipient.address,
+        ethers.parseEther("100"),
+      ]);
+
+      const description = "Proposal to be cancelled";
+      const proposeTx = await governor.propose(
+        [tokenAddress],
+        [0],
+        [transferCalldata],
+        description
+      );
+
+      const receipt = await proposeTx.wait();
+      const event = receipt.logs.find(
+        (log) => log.fragment && log.fragment.name === "ProposalCreated"
+      );
+      proposalId = event.args.proposalId;
+
+      // Proposal is Pending
+      expect(await governor.state(proposalId)).to.equal(0); // Pending
+
+      // Proposer (deployer) cancels
+      const descriptionHash = ethers.id(description);
+      await governor.cancel(
+        [tokenAddress],
+        [0],
+        [transferCalldata],
+        descriptionHash
+      );
+
+      // Should now be Canceled
+      expect(await governor.state(proposalId)).to.equal(2); // Canceled
     });
   });
 });
