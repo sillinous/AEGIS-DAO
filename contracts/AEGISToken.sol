@@ -17,6 +17,15 @@ contract AEGISToken is ERC20, ERC20Permit, ERC20Votes {
         _mint(msg.sender, INITIAL_SUPPLY);
     }
 
+    // Use timestamp-based voting checkpoints (EIP-6372) for chain-agnostic governance
+    function clock() public view override returns (uint48) {
+        return uint48(block.timestamp);
+    }
+
+    function CLOCK_MODE() public pure override returns (string memory) {
+        return "mode=timestamp";
+    }
+
     // Required overrides for multiple inheritance
     function _update(address from, address to, uint256 value)
         internal

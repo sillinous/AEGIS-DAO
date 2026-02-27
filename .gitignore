@@ -43,3 +43,7 @@ npm-debug.log*
 # Original Claude Desktop export (restructured into proper folders)
 AEGIS DAO - Deployment Package/
 deployments/localhost-*.json
+
+# Frontend
+frontend/node_modules/
+frontend/dist/

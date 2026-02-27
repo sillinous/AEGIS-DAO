@@ -36,10 +36,10 @@ A decentralized autonomous organization (DAO) for autonomous economic operations
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| Voting Delay | 7,200 blocks | ~1 day before voting starts |
-| Voting Period | 50,400 blocks | ~1 week to cast votes |
+| Voting Delay | 86,400 seconds | 1 day before voting starts (timestamp mode) |
+| Voting Period | 604,800 seconds | 1 week to cast votes (timestamp mode) |
 | Quorum | 4% | Minimum participation required |
-| Proposal Threshold | 0 | Anyone can create proposals |
+| Proposal Threshold | 1,000 AEGIS | 0.1% of supply required to propose |
 | Timelock Delay | 86,400 seconds | 1 day delay before execution |
 
 ## Quick Start
@@ -137,8 +137,24 @@ npm run clean          # Clean build artifacts
 
 - **Timelock Controller**: All actions have a mandatory delay
 - **Quorum Requirement**: Prevents minority takeover
+- **Proposal Threshold**: 1,000 AEGIS required to create proposals (prevents spam)
+- **Timestamp-Based Governance**: Chain-agnostic timing via EIP-6372 (works correctly on any EVM chain)
 - **OpenZeppelin Base**: Battle-tested, audited contracts
 - **No Admin Keys**: After deployment, only governance controls the DAO
+
+## Frontend
+
+A React governance dashboard for interacting with the DAO.
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+# Set contract addresses in .env
+npm run dev
+```
+
+**Features**: wallet connection, governance dashboard, proposal listing with voting, proposal creation (native/token transfers), and vote delegation management.
 
 ## Project Structure
 
@@ -148,6 +164,13 @@ AEGIS-DAO/
 │   ├── AEGISToken.sol      # Governance token
 │   ├── AEGISGovernor.sol   # DAO governance
 │   └── AEGISTreasury.sol   # Timelock treasury
+├── frontend/               # React governance dashboard
+│   ├── src/
+│   │   ├── components/     # UI components
+│   │   ├── context/        # Web3 wallet context
+│   │   ├── abis.js         # Contract ABIs
+│   │   └── App.jsx         # App shell
+│   └── package.json
 ├── scripts/
 │   ├── deploy.js           # Deployment script
 │   └── verify.js           # Contract verification
