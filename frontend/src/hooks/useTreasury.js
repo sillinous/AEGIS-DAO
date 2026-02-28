@@ -3,7 +3,7 @@ import { formatEther, parseEther } from 'ethers';
 import { useWeb3 } from '../contexts/Web3Context';
 
 export function useTreasury() {
-  const { contracts, readContracts, provider, network, signer } = useWeb3();
+  const { contracts, readContracts, provider, network, signer, subscribe } = useWeb3();
   const [treasuryData, setTreasuryData] = useState({
     balance: '0',
     minDelay: 0,
@@ -45,6 +45,12 @@ export function useTreasury() {
   }, [c, provider, network]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Auto-refresh on contract events
+  useEffect(() => {
+    if (!subscribe) return;
+    return subscribe('refresh:treasury', refresh);
+  }, [subscribe, refresh]);
 
   const deposit = useCallback(async (amount) => {
     if (!signer || !network?.contracts?.treasury) throw new Error('Wallet not connected');

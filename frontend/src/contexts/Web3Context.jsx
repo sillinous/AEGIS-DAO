@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserProvider, Contract, formatEther, formatUnits } from 'ethers';
 import { TOKEN_ABI, GOVERNOR_ABI, TREASURY_ABI } from '../constants/abis';
 import { NETWORKS, SUPPORTED_CHAIN_IDS } from '../constants/config';
@@ -12,9 +12,30 @@ export function Web3Provider({ children }) {
   const [chainId, setChainId] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState(null);
+  const [blockNumber, setBlockNumber] = useState(0);
+
+  // Event bus for real-time updates
+  const listenersRef = useRef(new Map());
 
   const network = chainId ? NETWORKS[chainId] : null;
   const isSupported = chainId ? SUPPORTED_CHAIN_IDS.includes(chainId) : false;
+
+  // Subscribe to internal event bus
+  const subscribe = useCallback((eventName, callback) => {
+    const listeners = listenersRef.current;
+    if (!listeners.has(eventName)) {
+      listeners.set(eventName, new Set());
+    }
+    listeners.get(eventName).add(callback);
+    return () => listeners.get(eventName)?.delete(callback);
+  }, []);
+
+  const emit = useCallback((eventName, data) => {
+    const callbacks = listenersRef.current.get(eventName);
+    if (callbacks) {
+      callbacks.forEach((cb) => cb(data));
+    }
+  }, []);
 
   // Contract instances
   const contracts = useMemo(() => {
@@ -41,6 +62,71 @@ export function Web3Provider({ children }) {
       treasury: new Contract(treasury, TREASURY_ABI, provider),
     };
   }, [provider, network]);
+
+  // Real-time event listeners on contracts
+  useEffect(() => {
+    const c = contracts || readContracts;
+    if (!c) return;
+
+    const cleanups = [];
+
+    const onTransfer = (from, to, value, event) => {
+      emit('Transfer', { from, to, value, event });
+      emit('refresh:token', {});
+    };
+    c.token.on('Transfer', onTransfer);
+    cleanups.push(() => c.token.off('Transfer', onTransfer));
+
+    const onDelegateChanged = (delegator, fromDelegate, toDelegate, event) => {
+      emit('DelegateChanged', { delegator, fromDelegate, toDelegate, event });
+      emit('refresh:token', {});
+    };
+    c.token.on('DelegateChanged', onDelegateChanged);
+    cleanups.push(() => c.token.off('DelegateChanged', onDelegateChanged));
+
+    const onProposalCreated = (...args) => {
+      emit('ProposalCreated', args);
+      emit('refresh:governor', {});
+    };
+    c.governor.on('ProposalCreated', onProposalCreated);
+    cleanups.push(() => c.governor.off('ProposalCreated', onProposalCreated));
+
+    const onVoteCast = (voter, proposalId, support, weight, reason, event) => {
+      emit('VoteCast', { voter, proposalId, support, weight, reason, event });
+      emit('refresh:governor', {});
+    };
+    c.governor.on('VoteCast', onVoteCast);
+    cleanups.push(() => c.governor.off('VoteCast', onVoteCast));
+
+    const onProposalQueued = (proposalId, etaSeconds, event) => {
+      emit('ProposalQueued', { proposalId, etaSeconds, event });
+      emit('refresh:governor', {});
+    };
+    c.governor.on('ProposalQueued', onProposalQueued);
+    cleanups.push(() => c.governor.off('ProposalQueued', onProposalQueued));
+
+    const onProposalExecuted = (proposalId, event) => {
+      emit('ProposalExecuted', { proposalId, event });
+      emit('refresh:governor', {});
+      emit('refresh:treasury', {});
+    };
+    c.governor.on('ProposalExecuted', onProposalExecuted);
+    cleanups.push(() => c.governor.off('ProposalExecuted', onProposalExecuted));
+
+    return () => cleanups.forEach((fn) => fn());
+  }, [contracts, readContracts, emit]);
+
+  // Track block number
+  useEffect(() => {
+    if (!provider) return;
+    const onBlock = (num) => {
+      setBlockNumber(num);
+      emit('block', num);
+    };
+    provider.on('block', onBlock);
+    provider.getBlockNumber().then(setBlockNumber).catch(() => {});
+    return () => provider.off('block', onBlock);
+  }, [provider, emit]);
 
   const connect = useCallback(async () => {
     if (!window.ethereum) {
@@ -86,7 +172,6 @@ export function Web3Provider({ children }) {
         params: [{ chainId: hexChainId }],
       });
     } catch (err) {
-      // Chain not added - try to add it
       if (err.code === 4902) {
         const net = NETWORKS[targetChainId];
         if (!net) return;
@@ -113,7 +198,6 @@ export function Web3Provider({ children }) {
         disconnect();
       } else {
         setAccount(accounts[0]);
-        // Refresh signer
         if (provider) {
           provider.getSigner().then(setSigner);
         }
@@ -123,7 +207,6 @@ export function Web3Provider({ children }) {
     const handleChainChanged = (hexChainId) => {
       const newChainId = parseInt(hexChainId, 16);
       setChainId(newChainId);
-      // Refresh provider and signer
       const browserProvider = new BrowserProvider(window.ethereum);
       setProvider(browserProvider);
       browserProvider.getSigner().then(setSigner);
@@ -158,12 +241,15 @@ export function Web3Provider({ children }) {
     error,
     contracts,
     readContracts,
+    blockNumber,
     connect,
     disconnect,
     switchNetwork,
+    subscribe,
+    emit,
     formatEther,
     formatUnits,
-  }), [provider, signer, account, chainId, network, isSupported, isConnecting, error, contracts, readContracts, connect, disconnect, switchNetwork]);
+  }), [provider, signer, account, chainId, network, isSupported, isConnecting, error, contracts, readContracts, blockNumber, connect, disconnect, switchNetwork, subscribe, emit]);
 
   return (
     <Web3Context.Provider value={value}>

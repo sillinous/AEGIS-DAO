@@ -3,7 +3,7 @@ import { formatUnits, parseUnits } from 'ethers';
 import { useWeb3 } from '../contexts/Web3Context';
 
 export function useToken() {
-  const { contracts, readContracts, account } = useWeb3();
+  const { contracts, readContracts, account, subscribe } = useWeb3();
   const [tokenData, setTokenData] = useState({
     name: '',
     symbol: '',
@@ -57,6 +57,12 @@ export function useToken() {
   }, [c, account]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Auto-refresh on contract events
+  useEffect(() => {
+    if (!subscribe) return;
+    return subscribe('refresh:token', refresh);
+  }, [subscribe, refresh]);
 
   const transfer = useCallback(async (to, amount) => {
     if (!contracts?.token) throw new Error('Wallet not connected');

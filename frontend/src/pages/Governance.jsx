@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Interface, parseUnits } from 'ethers';
+import { Interface, parseUnits, parseEther } from 'ethers';
 import { useWeb3 } from '../contexts/Web3Context';
 import { useGovernor } from '../hooks/useGovernor';
 import { useToken } from '../hooks/useToken';
 import { TOKEN_ABI } from '../constants/abis';
 import { PROPOSAL_STATES } from '../constants/config';
-import { shortenAddress, formatTokenAmount, formatNumber } from '../utils/format';
+import { shortenAddress, formatTokenAmount } from '../utils/format';
 import TransactionStatus from '../components/common/TransactionStatus';
+import { ProposalCardSkeleton } from '../components/common/Skeleton';
 
 const STATE_FILTERS = [
   { label: 'All', value: null },
@@ -88,7 +89,13 @@ export default function Governance() {
       </div>
 
       {/* Proposals list */}
-      {filteredProposals.length === 0 ? (
+      {governor.loading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <ProposalCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : filteredProposals.length === 0 ? (
         <div className="card text-center py-16">
           <svg className="w-16 h-16 mx-auto text-gray-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.75}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" />
@@ -174,6 +181,10 @@ function CreateProposalForm({ governor, token, setTxStatus, setTxHash, setTxErro
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
 
+  // ETH send fields
+  const [ethRecipient, setEthRecipient] = useState('');
+  const [ethAmount, setEthAmount] = useState('');
+
   // Custom action fields
   const [customTarget, setCustomTarget] = useState('');
   const [customValue, setCustomValue] = useState('0');
@@ -197,6 +208,10 @@ function CreateProposalForm({ governor, token, setTxStatus, setTxHash, setTxErro
         targets = [tokenAddress];
         values = [0n];
         calldatas = [calldata];
+      } else if (proposalType === 'eth') {
+        targets = [ethRecipient];
+        values = [parseEther(ethAmount)];
+        calldatas = ['0x'];
       } else {
         targets = [customTarget];
         values = [BigInt(customValue)];
@@ -214,7 +229,7 @@ function CreateProposalForm({ governor, token, setTxStatus, setTxHash, setTxErro
   };
 
   return (
-    <div className="card border-aegis-500/20">
+    <div className="card border-aegis-500/20 animate-fade-in">
       <h3 className="text-lg font-semibold text-white mb-4">Create Proposal</h3>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -232,33 +247,29 @@ function CreateProposalForm({ governor, token, setTxStatus, setTxHash, setTxErro
 
         <div>
           <label className="label">Action Type</label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setProposalType('transfer')}
-              className={`flex-1 px-3 py-2 rounded-lg text-sm border transition-all ${
-                proposalType === 'transfer'
-                  ? 'bg-aegis-600/15 border-aegis-500/30 text-aegis-400'
-                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
-              }`}
-            >
-              Token Transfer
-            </button>
-            <button
-              type="button"
-              onClick={() => setProposalType('custom')}
-              className={`flex-1 px-3 py-2 rounded-lg text-sm border transition-all ${
-                proposalType === 'custom'
-                  ? 'bg-aegis-600/15 border-aegis-500/30 text-aegis-400'
-                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
-              }`}
-            >
-              Custom Action
-            </button>
+          <div className="flex gap-2 flex-wrap">
+            {[
+              { key: 'transfer', label: 'Token Transfer' },
+              { key: 'eth', label: `Send ${network?.currency?.symbol || 'ETH'}` },
+              { key: 'custom', label: 'Custom Action' },
+            ].map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setProposalType(t.key)}
+                className={`flex-1 min-w-[120px] px-3 py-2 rounded-lg text-sm border transition-all ${
+                  proposalType === t.key
+                    ? 'bg-aegis-600/15 border-aegis-500/30 text-aegis-400'
+                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {proposalType === 'transfer' ? (
+        {proposalType === 'transfer' && (
           <>
             <div>
               <label className="label">Recipient Address</label>
@@ -283,7 +294,39 @@ function CreateProposalForm({ governor, token, setTxStatus, setTxHash, setTxErro
               />
             </div>
           </>
-        ) : (
+        )}
+
+        {proposalType === 'eth' && (
+          <>
+            <div>
+              <label className="label">Recipient Address</label>
+              <input
+                type="text"
+                value={ethRecipient}
+                onChange={(e) => setEthRecipient(e.target.value)}
+                placeholder="0x..."
+                className="input-field font-mono text-sm"
+                required
+              />
+            </div>
+            <div>
+              <label className="label">Amount ({network?.currency?.symbol || 'ETH'})</label>
+              <input
+                type="text"
+                value={ethAmount}
+                onChange={(e) => setEthAmount(e.target.value)}
+                placeholder="0.0"
+                className="input-field"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Sends {network?.currency?.symbol || 'ETH'} from the treasury to the recipient.
+              </p>
+            </div>
+          </>
+        )}
+
+        {proposalType === 'custom' && (
           <>
             <div>
               <label className="label">Target Contract Address</label>

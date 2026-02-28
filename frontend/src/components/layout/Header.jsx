@@ -1,16 +1,24 @@
 import { useWeb3 } from '../../contexts/Web3Context';
-import { shortenAddress } from '../../utils/format';
-import { NETWORKS, SUPPORTED_CHAIN_IDS } from '../../constants/config';
 import ConnectWallet from '../common/ConnectWallet';
 import NetworkBadge from '../common/NetworkBadge';
 
-export default function Header() {
-  const { account, chainId, isSupported } = useWeb3();
+export default function Header({ onToggleSidebar }) {
+  const { account } = useWeb3();
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-800 bg-gray-950/80 backdrop-blur-xl">
-      <div className="flex items-center justify-between px-6 py-4">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-4">
         <div className="flex items-center gap-3">
+          {/* Mobile hamburger */}
+          <button
+            onClick={onToggleSidebar}
+            className="lg:hidden p-1.5 -ml-1.5 text-gray-400 hover:text-white transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+          </button>
+
           <div className="flex items-center gap-2">
             <svg viewBox="0 0 100 100" className="w-8 h-8">
               <defs>
@@ -29,7 +37,7 @@ export default function Header() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {account && <NetworkBadge />}
           <ConnectWallet />
         </div>

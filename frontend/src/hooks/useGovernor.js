@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { id as hashId, parseUnits } from 'ethers';
+import { id as hashId } from 'ethers';
 import { useWeb3 } from '../contexts/Web3Context';
-import { GOVERNANCE } from '../constants/config';
 
 export function useGovernor() {
-  const { contracts, readContracts, account, provider } = useWeb3();
+  const { contracts, readContracts, account, provider, subscribe } = useWeb3();
   const [govData, setGovData] = useState({
     votingDelay: 0,
     votingPeriod: 0,
@@ -62,7 +61,6 @@ export function useGovernor() {
 
     try {
       const currentBlock = await provider.getBlockNumber();
-      // Search the last 100,000 blocks (or from block 0 on local)
       const fromBlock = Math.max(0, currentBlock - 100000);
 
       const filter = c.governor.filters.ProposalCreated();
@@ -121,6 +119,15 @@ export function useGovernor() {
   }, [c, provider, account]);
 
   useEffect(() => { fetchProposals(); }, [fetchProposals]);
+
+  // Auto-refresh on contract events
+  useEffect(() => {
+    if (!subscribe) return;
+    return subscribe('refresh:governor', () => {
+      refresh();
+      fetchProposals();
+    });
+  }, [subscribe, refresh, fetchProposals]);
 
   const propose = useCallback(async (targets, values, calldatas, description) => {
     if (!contracts?.governor) throw new Error('Wallet not connected');
