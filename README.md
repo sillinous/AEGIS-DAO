@@ -7,21 +7,27 @@ A decentralized autonomous organization (DAO) for autonomous economic operations
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     AEGIS DAO                           │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐ │
-│  │ AEGISToken  │───▶│AEGISGovernor│───▶│AEGISTreasury│ │
-│  │   (ERC20)   │    │ (Governor)  │    │ (Timelock)  │ │
-│  └─────────────┘    └─────────────┘    └─────────────┘ │
-│        │                   │                  │        │
-│        ▼                   ▼                  ▼        │
-│   Voting Power        Proposals          Execution     │
-│   Delegation          Voting             Delay         │
-│                       Quorum             Security      │
-│                                                        │
-└────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                          AEGIS DAO                                   │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │                    Frontend (React + Vite)                     │  │
+│  │  Dashboard │ Governance │ Token │ Treasury │ Proposal Detail  │  │
+│  └──────┬─────────────┬─────────────┬────────────────────────────┘  │
+│         │             │             │                                │
+│         ▼             ▼             ▼                                │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐                   │
+│  │ AEGISToken  │─│AEGISGovernor│─│AEGISTreasury│                   │
+│  │   (ERC20)   │ │ (Governor)  │ │ (Timelock)  │                   │
+│  └─────────────┘ └─────────────┘ └─────────────┘                   │
+│        │                │                │                           │
+│        ▼                ▼                ▼                           │
+│   Voting Power     Proposals        Execution                       │
+│   Delegation       Voting           Delay                           │
+│                    Quorum           Security                        │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Contracts
@@ -72,6 +78,10 @@ npm run deploy:local
 
 # Run tests
 npm test
+
+# Start the frontend (in another terminal)
+npm run frontend:install
+npm run frontend:dev
 ```
 
 ### Deploy to Testnet
@@ -106,6 +116,8 @@ npm run deploy:polygon # Deploy to Polygon Mainnet
 npm run verify:amoy    # Verify contracts on Polygonscan
 npm run node           # Start local Hardhat node
 npm run clean          # Clean build artifacts
+npm run frontend:dev   # Start frontend dev server
+npm run frontend:build # Build frontend for production
 ```
 
 ## Governance Workflow
@@ -145,18 +157,70 @@ npm run clean          # Clean build artifacts
 ```
 AEGIS-DAO/
 ├── contracts/
-│   ├── AEGISToken.sol      # Governance token
-│   ├── AEGISGovernor.sol   # DAO governance
-│   └── AEGISTreasury.sol   # Timelock treasury
+│   ├── AEGISToken.sol         # Governance token (ERC20 + Votes)
+│   ├── AEGISGovernor.sol      # DAO governance (proposals, voting)
+│   └── AEGISTreasury.sol      # Timelock treasury
+├── frontend/
+│   ├── src/
+│   │   ├── components/        # Reusable UI components
+│   │   │   ├── layout/        # Header, Sidebar
+│   │   │   ├── common/        # ConnectWallet, NetworkBadge, TransactionStatus
+│   │   │   └── ...
+│   │   ├── constants/         # ABIs, network config, governance params
+│   │   ├── contexts/          # Web3Context (wallet, contracts, provider)
+│   │   ├── hooks/             # useToken, useGovernor, useTreasury
+│   │   ├── pages/             # Dashboard, Token, Governance, Treasury, ProposalDetail
+│   │   ├── utils/             # Formatting helpers
+│   │   ├── App.jsx            # Root component with routing
+│   │   └── main.jsx           # Entry point
+│   ├── package.json
+│   └── vite.config.js
 ├── scripts/
-│   ├── deploy.js           # Deployment script
-│   └── verify.js           # Contract verification
+│   ├── deploy.js              # Deployment script
+│   └── verify.js              # Contract verification
 ├── test/
-│   └── AEGIS.test.js       # Test suite
-├── deployments/            # Deployment records (gitignored)
+│   └── AEGIS.test.js          # Test suite
+├── deployments/               # Deployment records (gitignored)
 ├── hardhat.config.js
 ├── package.json
 └── .env.example
+```
+
+## Frontend
+
+The frontend is a React SPA (Vite + Tailwind CSS) that provides a complete interface for all DAO operations.
+
+### Pages
+
+| Page | Path | Features |
+|------|------|----------|
+| Dashboard | `/` | DAO stats, your position, governance parameters, recent proposals, workflow guide |
+| Governance | `/governance` | Proposal list with state filters, create new proposals (token transfer or custom calldata) |
+| Proposal Detail | `/governance/proposal/:id` | Full proposal view: timeline, vote breakdown, cast vote (For/Against/Abstain with reason), queue, execute, cancel |
+| Token | `/token` | Balance overview, transfer tokens, delegate voting power, approve spenders, check allowances |
+| Treasury | `/treasury` | Treasury balance, deposit funds, check roles (PROPOSER/EXECUTOR/ADMIN), check operation status |
+
+### Contract Integration
+
+Every public function from all three smart contracts is accessible through the frontend:
+
+**AEGISToken**: `balanceOf`, `transfer`, `approve`, `allowance`, `delegate`, `delegates`, `getVotes`, `getPastVotes`, `totalSupply`, `name`, `symbol`, `decimals`
+
+**AEGISGovernor**: `propose`, `castVote`, `castVoteWithReason`, `queue`, `execute`, `cancel`, `state`, `proposalVotes`, `proposalSnapshot`, `proposalDeadline`, `proposalProposer`, `proposalEta`, `hasVoted`, `votingDelay`, `votingPeriod`, `proposalThreshold`, `quorum`
+
+**AEGISTreasury**: `getMinDelay`, `hasRole`, `PROPOSER_ROLE`, `EXECUTOR_ROLE`, `DEFAULT_ADMIN_ROLE`, `isOperationPending`, `isOperationReady`, `isOperationDone`, `getOperationState`, `receive()` (deposit)
+
+### Configuration
+
+After deploying contracts, update the contract addresses in `frontend/src/constants/config.js`:
+
+```js
+// In NETWORKS[chainId].contracts
+contracts: {
+  token: '0x...deployed-token-address',
+  governor: '0x...deployed-governor-address',
+  treasury: '0x...deployed-treasury-address',
+}
 ```
 
 ## Networks
@@ -168,10 +232,12 @@ AEGIS-DAO/
 
 ## Next Steps After Deployment
 
-1. **Distribute Tokens**: Send AEGIS to initial DAO members
-2. **Fund Treasury**: Transfer operational funds to treasury contract
-3. **Create First Proposal**: Test the governance system
-4. **Implement Revenue Strategies**: Per the AgenticProtocolsForAutonomousRevenue roadmap
+1. **Update Frontend Config**: Set contract addresses in `frontend/src/constants/config.js`
+2. **Launch Frontend**: Run `npm run frontend:dev` to start the UI
+3. **Distribute Tokens**: Send AEGIS to initial DAO members via the Token page
+4. **Fund Treasury**: Deposit operational funds via the Treasury page
+5. **Create First Proposal**: Test governance through the Governance page
+6. **Implement Revenue Strategies**: Per the AgenticProtocolsForAutonomousRevenue roadmap
 
 ## License
 
